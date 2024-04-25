@@ -27,3 +27,18 @@ HP ha identificado las plataformas afectadas y los correspondientes SoftPaqs con
     - Control de Seguridad:
     MEBx también juega un papel crucial en la seguridad del sistema al permitir la configuración de políticas de seguridad avanzadas. Esto incluye la gestión de certificados digitales, el establecimiento de reglas de autenticación y la configuración de permisos de acceso remoto.
     La capacidad de controlar la MEBx desde la BIOS agrega una capa adicional de seguridad al sistema al proporcionar opciones para proteger la gestión remota y los datos confidenciales almacenados en la Intel Management Engine.
+
+4) Coreboot, anteriormente conocido como LinuxBIOS, es un proyecto de software destinado a reemplazar el firmware propietario (BIOS o UEFI) que se encuentra en la mayoría de los ordenadores. Está diseñado para ser un firmware ligero que realiza solo el número mínimo de tareas necesarias para cargar y ejecutar un sistema operativo moderno de 32 o 64 bits12.
+El objetivo de Coreboot es ofrecer las funciones más elementales al inicio del sistema para luego pasar a inicializar el hardware. Después de esta inicialización, comienza la secuencia de arranque del sistema operativo.
+Esencialmente, Coreboot es una iniciativa destinada a «abrir» y simplificar el nivel de firmware de los ordenadores modernos. Aunque la mayor parte del software de Coreboot es libre, se requieren blobs binarios para que funcione en algunos dispositivos de hardware. Libreboot es una versión de Coreboot que está completamente libre de blobs y, por tanto, es 100% software libre.
+Coreboot es respaldado por la Free Software Foundation (FSF) y su existencia no se basa en una necesidad tecnológica, sino en una ética, ya que para los miembros de la FSF es importante que todo el software del PC sea libre
+
+Algunos de los productos que incorporan coreboot son:
+- System76: Esta compañía ha decidido tener un catálogo de portátiles profesionales muy atractivos y potentes para los usuarios profesionales de GNU/Linux. El nuevo Oryx Pro de System76 es el primer portátil que combina Coreboot y NVIDIA1. Este portátil incluye un procesador Intel Core i7-10875H con 8 núcleos físicos, 16 hilos, 2,3GHz de frecuencia base y 5,1GHz de velocidad en modo turbo.
+
+- Fabricantes de placas base: Algunos fabricantes de placas base como MSI, Gigabyte y Tyan han ofrecido Coreboot junto al BIOS propietario estándar o han proporcionado las especificaciones de las interfaces del hardware para algunas de sus placas base recientes.
+
+- Google Chromebooks: Muchos Chromebooks utilizan Coreboot como firmware base debido a su enfoque en la seguridad, la rapidez de arranque y la flexibilidad. 
+
+5) Se ejecuto el codigo helloworld:
+![alt text](image.png)
