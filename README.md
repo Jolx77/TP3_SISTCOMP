@@ -233,6 +233,7 @@ En el contexto de la creación de bootloaders o firmware de bajo nivel, generar 
 - Break call interrupcion:
  ![alt text](image-3.png)
 - Una instruccion despues:
+
  ![alt text](image-4.png)
 - Un c y otra instruccion despues:
  ![alt text](image-5.png)
@@ -244,4 +245,3 @@ En el contexto de la creación de bootloaders o firmware de bajo nivel, generar 
  ![alt text](image-9.png)
  ![alt text](image-10.png)
  ![alt text](image-11.png)
- 
