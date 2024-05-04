@@ -251,90 +251,79 @@ En el contexto de la creación de bootloaders o firmware de bajo nivel, generar 
 ### Código para pasar de modo real a modo protegido
 
 ```c
-[org 0x7C00] ; Set origin to bootloader address
+BITS 16             ; 16-bit mode
+org 0x7C00          ; BIOS loads boot sector to 0x7C00
 
-msg db "Switching to Protected Mode...", 0 ; Define the message string
+start:
+    cli             ; Disable interrupts
+    xor ax, ax      ; Set AX to 0
+    mov ds, ax      ; Set DS to 0
+    mov ss, ax      ; Set SS to 0
+    mov sp, 0x7C00  ; Set SP to 0x7C00
+    sti             ; Enable interrupts
 
-; Define Global Descriptor Table (GDT)
+    lgdt [gdt_desc] ; Load the GDT
+    mov eax, cr0    ; Load CR0
+    or eax, 0x1     ; Set the protected mode bit
+    mov cr0, eax    ; Update CR0 to enable protected mode
+
+    jmp CODE_SEG:start_protected ; Jump to the next instruction in protected mode
+
 gdt_start:
-    dq 0x0000000000000000 ; Null descriptor
-    dq 0x00000000009A0000 ; Code descriptor
-    dq 0x0000000000920000 ; Data descriptor
+    dq 0x0          ; Null descriptor
+    dq 0x0          ; Code descriptor
+    dq 0x0          ; Data descriptor
 gdt_end:
 
-; Define GDT pointer
-gdt_descriptor:
-    dw gdt_end - gdt_start - 1 ; Limit (size of GDT)
-    dq gdt_start ; Base address of GDT
+gdt_desc:
+    dw gdt_end - gdt_start - 1   ; Limit
+    dd gdt_start                 ; Base address
 
-; Define a label for the code to switch to protected mode
-switch_to_protected_mode:
-    cli ; Disable interrupts
+CODE_SEG equ gdt_code - gdt_start
+DATA_SEG equ gdt_data - gdt_start
 
-    lgdt [gdt_descriptor] ; Load GDT
+gdt_code:
+    dw 0xFFFF       ; Limit (0-15)
+    dw 0x0          ; Base (0-15)
+    db 0x0          ; Base (16-23)
+    db 10011010b    ; Access byte
+    db 11001111b    ; Granularity
+    db 0x0          ; Base (24-31)
 
-    mov eax, cr0
-    or eax, 0x1 ; Set PE (Protected Mode Enable) bit
-    mov cr0, eax ; Enable protected mode
+gdt_data:
+    dw 0xFFFF       ; Limit (0-15)
+    dw 0x0          ; Base (0-15)
+    db 0x0          ; Base (16-23)
+    db 10010010b    ; Access byte
+    db 11001111b    ; Granularity
+    db 0x0          ; Base (24-31)
 
-    ; Print message before switching to protected mode
-    mov ah, 0x0E ; BIOS teletype function
-    mov bh, 0x00 ; Display page
-    mov edi, msg ; Pointer to message string
-    call print_string ; Call print_string function
-
-    jmp CODE_SEG:protected_mode ; Jump to protected mode code
-
-; Define data segment descriptor
-DATA_SEG equ gdt_start + 16
-; Define code segment descriptor
-CODE_SEG equ gdt_start + 8
-
-[bits 32] ; Switch to 32-bit protected mode
-
-; Define code segment descriptor for protected mode
-protected_mode:
-    mov ax, DATA_SEG ; Load data segment descriptor
-    mov ds, ax
-    mov ss, ax ; Stack segment
-    mov es, ax ; Extra segment
-    mov fs, ax ; Additional segment
-    mov gs, ax ; General-purpose segment
-
-    mov esp, 0x90000 ; Set stack pointer
-
-    mov ax, 0x10
+start_protected:
+    mov ax, DATA_SEG    ; Load the data segment
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
+
+    mov ax, 0x9000      ; Set stack to 0x9000
     mov ss, ax
+    mov sp, 0xFFFF
 
-    ; Now you are in protected mode
+    sti
+    
+    mov ah, 0x0e        ; BIOS teletype function
+    mov al, 'P'         ; Print 'P'
+    int 0x10
 
-    jmp 0x08:protected_mode_start ; Jump to protected mode code
+    jmp $               ; Infinite loop
 
-; Start of protected mode code
-protected_mode_start:
-    ; Your protected mode code here
+times 510 - ($-$$) db 0 ; Fill the rest of sector with 0s
+dw 0xAA55               ; Boot signature
 
-; Define bootloader signature
-times 510-($-$$) db 0
-dw 0xAA55 ; Bootloader signature
-
-; Function to print a null-terminated stringen 
-print_string:
-    .next_char:
-        lodsb ; Load character from string into AL
-        cmp al, 0 ; Check if end of string
-        je .done ; If end of string, done
-        int 0x10 ; Call BIOS interrupt to print character
-        jmp .next_char ; Repeat for next character
-    .done:
-        ret
 
 ```
 
+En este código comenzamos seteando el origen del código en 0x7C00, que es donde la BIOS carga el sector de booteo, luego pasamos a la parte del label start donde se deshabilitan las interrupciones (cli) para luego cargar con el comando lgdt en la tabla de registros globales lo que se encuentra guardado en la estructura en memoria llamada gdt_desc, la cual hace referencia a la entrada de la tabla de registros que queremos guardar. Dentro de esta encontramos referencia al segmento de código y datos junto con los datos de inicio, tamaño, etc. Luego seteamos el bit de menor peso del registro cr0 en 1 para habilitar el modo protegido. Por último se inicializan los segmentos con los valores guardados en la entrada de la tabla, se setea el segmento de Pila (SS) y se imprime una letra P llamando a la interrupción 0x10. Por último se realiza un bucle infinito.
 
 ### Inicialización de segmentos 
 
