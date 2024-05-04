@@ -245,3 +245,86 @@ En el contexto de la creación de bootloaders o firmware de bajo nivel, generar 
  ![alt text](image-9.png)
  ![alt text](image-10.png)
  ![alt text](image-11.png)
+
+## Desafío final
+
+### Código para pasar de modo real a modo protegido
+
+```c
+BITS 16             ; 16-bit mode
+org 0x7C00          ; BIOS loads boot sector to 0x7C00
+
+start:
+    cli             ; Disable interrupts
+    xor ax, ax      ; Set AX to 0
+    mov ds, ax      ; Set DS to 0
+    mov ss, ax      ; Set SS to 0
+    mov sp, 0x7C00  ; Set SP to 0x7C00
+    sti             ; Enable interrupts
+
+    lgdt [gdt_desc] ; Load the GDT
+    mov eax, cr0    ; Load CR0
+    or eax, 0x1     ; Set the protected mode bit
+    mov cr0, eax    ; Update CR0 to enable protected mode
+
+    jmp CODE_SEG:start_protected ; Jump to the next instruction in protected mode
+
+gdt_start:
+    dq 0x0          ; Null descriptor
+    dq 0x0          ; Code descriptor
+    dq 0x0          ; Data descriptor
+gdt_end:
+
+gdt_desc:
+    dw gdt_end - gdt_start - 1   ; Limit
+    dd gdt_start                 ; Base address
+
+CODE_SEG equ gdt_code - gdt_start
+DATA_SEG equ gdt_data - gdt_start
+
+gdt_code:
+    dw 0xFFFF       ; Limit (0-15)
+    dw 0x0          ; Base (0-15)
+    db 0x0          ; Base (16-23)
+    db 10011010b    ; Access byte
+    db 11001111b    ; Granularity
+    db 0x0          ; Base (24-31)
+
+gdt_data:
+    dw 0xFFFF       ; Limit (0-15)
+    dw 0x0          ; Base (0-15)
+    db 0x0          ; Base (16-23)
+    db 10010010b    ; Access byte
+    db 11001111b    ; Granularity
+    db 0x0          ; Base (24-31)
+
+start_protected:
+    mov ax, DATA_SEG    ; Load the data segment
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    mov ax, 0x9000      ; Set stack to 0x9000
+    mov ss, ax
+    mov sp, 0xFFFF
+
+    sti
+    
+    mov ah, 0x0e        ; BIOS teletype function
+    mov al, 'P'         ; Print 'P'
+    int 0x10
+
+    jmp $               ; Infinite loop
+
+times 510 - ($-$$) db 0 ; Fill the rest of sector with 0s
+dw 0xAA55               ; Boot signature
+
+
+```
+
+En este código comenzamos seteando el origen del código en 0x7C00, que es donde la BIOS carga el sector de booteo, luego pasamos a la parte del label start donde se deshabilitan las interrupciones (cli) para luego cargar con el comando lgdt en la tabla de registros globales lo que se encuentra guardado en la estructura en memoria llamada gdt_desc, la cual hace referencia a la entrada de la tabla de registros que queremos guardar. Dentro de esta encontramos referencia al segmento de código y datos junto con los datos de inicio, tamaño, etc. Luego seteamos el bit de menor peso del registro cr0 en 1 para habilitar el modo protegido. Por último se inicializan los segmentos con los valores guardados en la entrada de la tabla, se setea el segmento de Pila (SS) y se imprime una letra P llamando a la interrupción 0x10. Por último se realiza un bucle infinito.
+
+### Inicialización de segmentos 
+
+Luego de pasar a modo protegido, los registros de segmentos son cargados con los valores correspondientes, por ejemplo, el segmento de código suele apuntar al selector guardado en la tabla de descriptores (ya sea local o global), al igual que los segmentos de datos (DS, ES, FS, etc) que se cargan con el selector guardado en la tabla de descriptores. En ejemplos y ejercicios quizás es común ver que estos registros se cargan con 0x10.
