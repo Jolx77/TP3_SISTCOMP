@@ -327,4 +327,12 @@ En este código comenzamos seteando el origen del código en 0x7C00, que es dond
 
 ### Inicialización de segmentos 
 
-Luego de pasar a modo protegido, los registros de segmentos son cargados con los valores correspondientes, por ejemplo, el segmento de código suele apuntar al selector guardado en la tabla de descriptores (ya sea local o global), al igual que los segmentos de datos (DS, ES, FS, etc) que se cargan con el selector guardado en la tabla de descriptores. En ejemplos y ejercicios quizás es común ver que estos registros se cargan con 0x10.
+Una vez que estamos en modo protegido los registros de segmento se cargan con el valor de DATA_SEG (valor arbitrario), ya que, con estas directivas se logra actualizar el caché del descriptor, utilizado por el procesador para ahorrarse consultas a la GDT (Global Descriptor Table).
+```c
+    mov $DATA_SEG, %ax /*cargamos en ax el valor de DATA_SEG y se lo cargamos a todos los registros de segmentos */
+    mov %ax, %ds
+    mov %ax, %es
+    mov %ax, %fs
+    mov %ax, %gs
+    mov %ax, %ss
+```
