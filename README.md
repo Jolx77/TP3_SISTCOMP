@@ -251,74 +251,79 @@ En el contexto de la creación de bootloaders o firmware de bajo nivel, generar 
 ### Código para pasar de modo real a modo protegido
 
 ```c
-BITS 16             ; 16-bit mode
-org 0x7C00          ; BIOS loads boot sector to 0x7C00
+.equ CODE_SEG, gdt_code - gdt_start
+.equ DATA_SEG, gdt_data - gdt_start
 
-start:
-    cli             ; Disable interrupts
-    xor ax, ax      ; Set AX to 0
-    mov ds, ax      ; Set DS to 0
-    mov ss, ax      ; Set SS to 0
-    mov sp, 0x7C00  ; Set SP to 0x7C00
-    sti             ; Enable interrupts
+.code16
 
-    lgdt [gdt_desc] ; Load the GDT
-    mov eax, cr0    ; Load CR0
-    or eax, 0x1     ; Set the protected mode bit
-    mov cr0, eax    ; Update CR0 to enable protected mode
+print_message:
+    mov $message, %si
+print_loop:
+    lodsb
+    or %al, %al
+    jz done_print
+    mov $0x0e, %ah
+    xor %bh, %bh
+    int $0x10
+    jmp print_loop
+done_print:
+    ret
 
-    jmp CODE_SEG:start_protected ; Jump to the next instruction in protected mode
+message:
+    .asciz "In protected mode"
 
+protected_mode_start: /* Punto de entrada */ 
+   cli
+   lgdt gdt_descriptor
+
+   mov %cr0, %eax /* Movemos cr0 a eax para luego poner en 1 el bit menos significado (PE) */
+   orl $0x1, %eax
+   mov %eax, %cr0 
+
+   ljmp $CODE_SEG, $protected_mode /* Vamos hacia el label protected_mode mas abajo */
+
+protected_mode:
+
+    mov $DATA_SEG, %ax /*cargamos en ax el valor de DATA_SEG y se lo cargamos a todos los registros de segmentos */
+    mov %ax, %ds
+    mov %ax, %es
+    mov %ax, %fs
+    mov %ax, %gs
+    mov %ax, %ss
+
+    mov $0X7000, %ebp /* Seteo de inicio de la pila */
+    mov %ebp, %esp
+
+    call print_message /* Llamamos a la funcion que imprime el mensaje */
+
+    jmp $ /* loop infinito */
+
+
+/* seteo de entrada para la tabla de descriptor */ 
 gdt_start:
-    dq 0x0          ; Null descriptor
-    dq 0x0          ; Code descriptor
-    dq 0x0          ; Data descriptor
+    gdt_null:
+        .long 0x0 /* null entry */
+        .long 0x0
+    gdt_code: /* code entry */
+        .word 0xffff
+        .word 0x0
+        .byte 0x0
+        .byte 0b10011010 
+        .byte 0b11001111 /* Present, DPL = 00, ejecutable, G = 1, solo lectura */
+        .byte 0x0
+    gdt_data: /* data entry */
+        .word 0xffff
+        .word 0x0
+        .byte 0x0
+        .byte 0b10010010 /* presente, DPL = 00, no ejecutable, leible */
+        .byte 0b11001111 
+        .byte 0x0
 gdt_end:
 
-gdt_desc:
-    dw gdt_end - gdt_start - 1   ; Limit
-    dd gdt_start                 ; Base address
+gdt_descriptor:
+        .word gdt_end - gdt_start
+        .long gdt_start
 
-CODE_SEG equ gdt_code - gdt_start
-DATA_SEG equ gdt_data - gdt_start
-
-gdt_code:
-    dw 0xFFFF       ; Limit (0-15)
-    dw 0x0          ; Base (0-15)
-    db 0x0          ; Base (16-23)
-    db 10011010b    ; Access byte
-    db 11001111b    ; Granularity
-    db 0x0          ; Base (24-31)
-
-gdt_data:
-    dw 0xFFFF       ; Limit (0-15)
-    dw 0x0          ; Base (0-15)
-    db 0x0          ; Base (16-23)
-    db 10010010b    ; Access byte
-    db 11001111b    ; Granularity
-    db 0x0          ; Base (24-31)
-
-start_protected:
-    mov ax, DATA_SEG    ; Load the data segment
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
-
-    mov ax, 0x9000      ; Set stack to 0x9000
-    mov ss, ax
-    mov sp, 0xFFFF
-
-    sti
-    
-    mov ah, 0x0e        ; BIOS teletype function
-    mov al, 'P'         ; Print 'P'
-    int 0x10
-
-    jmp $               ; Infinite loop
-
-times 510 - ($-$$) db 0 ; Fill the rest of sector with 0s
-dw 0xAA55               ; Boot signature
 
 
 ```
