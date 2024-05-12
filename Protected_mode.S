@@ -1,66 +1,103 @@
-/* Bloque 1: Definición de los segmentos de código y datos */
-.equ CODE_SEG, 8  // Define el segmento de código como 8
-.equ DATA_SEG, gdt_data - gdt_start  // Define el segmento de datos como la diferencia entre gdt_data y gdt_start
+.equ CODE_SEG, gdt_code - gdt_start
+.equ DATA_SEG, gdt_data - gdt_start
 
-/* Bloque 2: Carga de la GDT en la memoria */
-lgdt gdt_descriptor  // Le dice al procesador dónde está nuestra Tabla Global de Descriptores (GDT) en la memoria
+.code16
 
-/* Bloque 3: Entrada en modo protegido */
-mov %cr0, %eax  // Mueve el contenido del Registro de Control 0 (CR0) a EAX
-orl $0x1, %eax  // Establece el bit PE (Protección Habilitada) en CR0
-mov %eax, %cr0  // Mueve el contenido de EAX a CR0
-ljmp $CODE_SEG, $protected_mode  // Salta a la etiqueta protected_mode en el segmento de código
+gpf_handler:
+    mov $gpf_message, %si
+print_gpf_loop:
+    lodsb
+    or %al, %al
+    jz done_gpf_print
+    mov $0x0e, %ah
+    xor %bh, %bh
+    int $0x10
+    jmp print_gpf_loop
+done_gpf_print:
+    jmp done_gpf_print  /* Bucle infinito */
+gpf_message:
+    .asciz "GPF!"
 
-gdt_start:  // Inicio de la GDT
-gdt_null:   // Descriptor nulo, requerido por la arquitectura x86
-    .long 0x0
-    .long 0x0
+protected_mode_start:
+   cli
+   lidt idt_descriptor
+   lgdt gdt_descriptor
 
-gdt_code:   // Descriptor del segmento de código
-    .word 0xffff  // Límite del segmento (tamaño)
-    .word 0x0     // Base del segmento (dirección de inicio)
-    .byte 0x0     // Base (parte media)
-    .byte 0b10011010  // Flags del segmento (presente, descriptor de segmento, nivel de privilegio, ejecutable, dirección de crecimiento)
-    .byte 0b11001111  // Límite (parte alta) y flags (tamaño y granularidad)
-    .byte 0x0     // Base (parte alta)
+   mov %cr0, %eax
+   orl $0x1, %eax
+   mov %eax, %cr0 
 
-gdt_data:   // Descriptor del segmento de datos
-    .word 0xffff  // Límite del segmento (tamaño)
-    .word 0x0     // Base del segmento (dirección de inicio)
-    .byte 0x0     // Base (parte media)
-    .byte 0b10010010  // Flags del segmento (presente, descriptor de segmento, nivel de privilegio, no ejecutable, dirección de crecimiento)
-    .byte 0b11001111  // Límite (parte alta) y flags (tamaño y granularidad)
-    .byte 0x0     // Base (parte alta)
+   ljmp $CODE_SEG, $protected_mode
 
-gdt_end:    // Fin de la GDT
-gdt_descriptor:  // Etiqueta para el descriptor de la GDT
-    .word gdt_end - gdt_start  // Define el tamaño de la GDT
-    .long gdt_start  // Define la dirección de inicio de la GDT
-vga_current_line:  // Etiqueta para la línea actual de la VGA
-    .long 0  // Inicializa la línea actual de la VGA en 0
-.code32
 protected_mode:
-    /* Setup the other segments.
-     * Those movs are mandatory because they update the descriptor cache:
-     * http://wiki.osdev.org/Descriptor_Cache
-     */
-    mov $DATA_SEG, %ax  // Mueve el valor de DATA_SEG a AX
-    mov %ax, %ds  // Mueve el contenido de AX al segmento de datos
-    mov %ax, %es  // Mueve el contenido de AX a ES
-    mov %ax, %fs  // Mueve el contenido de AX a FS
-    mov %ax, %gs  // Mueve el contenido de AX a GS
-    mov %ax, %ss  // Mueve el contenido de AX a SS
-    /* TODO detect the last memory address available properly.
-     * It depends on how much RAM we have.
-     */
-    mov $0X7000, %ebp  // Mueve el valor 0x7000 a EBP
-    mov %ebp, %esp  // Mueve el contenido de EBP a ESP
-.endm
 
-/* Setup the first Page Directory entry, which gives us a 4MB(2^10 * 2^12) memory region.
- * The memory region starts at 0, and the virtual address and physical address are identical.
- * 
- * The currently executing code is inside that range, or else we'd jump somewhere and die.
- */
-.equ page_directory, __end_align_4k
-.equ page_table, __end_align_4k + 0x1000
+    mov $DATA_SEG, %ax
+    mov %ax, %ds
+    mov %ax, %es
+    mov %ax, %fs
+    mov %ax, %gs
+    mov %ax, %ss
+
+    mov $0X7000, %esp
+    mov $0x1234, %bx
+    mov $0x5678, %cx
+    mov %cx, %ds:(%bx)
+    mov $protected_mode_message, %si
+    
+print_protected_mode_loop:
+    lodsb
+    or %al, %al
+    jz done_protected_mode_print
+    mov $0x0e, %ah
+    xor %bh, %bh
+    int $0x10
+    jmp print_protected_mode_loop
+done_protected_mode_print:
+
+loop:
+    jmp loop
+
+protected_mode_message:
+    .asciz "Protected Mode"
+
+gdt_start:
+    gdt_null:
+        .long 0x0
+        .long 0x0
+    gdt_code:
+        .word 0xffff
+        .word 0x0
+        .byte 0x0
+        .byte 0b10011010
+        .byte 0b11001111
+        .byte 0x0
+    gdt_data:
+        .word 0xffff
+        .word 0x0
+        .byte 0x0
+        .byte 0b10010000
+        .byte 0b11001111
+        .byte 0x0
+gdt_end:
+
+gdt_descriptor:
+        .word gdt_end - gdt_start
+        .long gdt_start
+
+idt_start:
+    .rept 1
+        .long 0x0
+        .long 0x0
+    .endr
+    idt_gpf:
+        .word gpf_handler
+        .word CODE_SEG
+        .byte 0x0
+        .byte 0b10001110
+        .word 0x0
+idt_end:
+
+idt_descriptor:
+    .word idt_end - idt_start
+    .long idt_start
+    
