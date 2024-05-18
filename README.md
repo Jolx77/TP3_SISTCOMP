@@ -251,122 +251,162 @@ En el contexto de la creación de bootloaders o firmware de bajo nivel, generar 
 ### Código para pasar de modo real a modo protegido
 
 ```c
-    /* Must come before they are used. */
-    .equ CODE_SEG, 8
-    .equ DATA_SEG, gdt_data - gdt_start
+.equ CODE_SEG, gdt_code - gdt_start
+.equ DATA_SEG_RW, gdt_data_rw - gdt_start
 
-    /* Tell the processor where our Global Descriptor Table is in memory. */
-    lgdt gdt_descriptor
+.code16
 
-    /* Set PE (Protection Enable) bit in CR0 (Control Register 0),
-     * effectively entering protected mode.
-     */
-    .code32 
-    mov %cr0, %eax
-    orl $0x1, %eax
-    mov %eax, %cr0
+protected_mode_start:
+   cli
+   lgdt gdt_descriptor
 
-    ljmp $CODE_SEG, $protected_mode
-/* Our GDT contains:
- *
- * * a null entry to fill the unusable entry 0:
- * http://stackoverflow.com/questions/33198282/why-have-the-first-segment-descriptor-of-the-global-descriptor-table-contain-onl
- * * a code and data. Both are necessary, because:
- * +
- * --
- * ** it is impossible to write to the code segment
- * ** it is impossible execute the data segment
- * --
- * +
- * Both start at 0 and span the entire memory,
- * allowing us to access anything without problems.
- *
- * A real OS might have 2 extra segments: user data and code.
- *
- * This is the case for the Linux kernel.
- *
- * This is better than modifying the privilege bit of the GDT
- * as we'd have to reload it several times, losing cache.
- */
+   /* Configurar el manejador de interrupciones para la excepción GPF */
+   lidt idt_descriptor
+
+   mov %cr0, %eax
+   orl $0x1, %eax
+   mov %eax, %cr0 
+
+   ljmp $CODE_SEG, $protected_mode
+
 gdt_start:
-gdt_null:
-    .long 0x0
-    .long 0x0
-gdt_code:
-    .word 0xffff
-    .word 0x0
-    .byte 0x0
-    .byte 0b10011010
-    .byte 0b11001111
-    .byte 0x0
-gdt_data:
-    .word 0xffff
-    .word 0x0
-    .byte 0x0
-    .byte 0b10010010
-    .byte 0b11001111
-    .byte 0x0
+    gdt_null:
+        .long 0x0
+        .long 0x0
+    gdt_code:
+        .word 0xffff
+        .word 0x0
+        .byte 0x0
+        .byte 0b10011010
+        .byte 0b11001111
+        .byte 0x0
+    gdt_data_rw:
+        .word 0xffff
+        .word 0x0
+        .byte 0x0
+        .byte 0b10010000 /* lectura/escritura */
+        .byte 0b11001111
+        .byte 0x0
 gdt_end:
+
 gdt_descriptor:
     .word gdt_end - gdt_start
     .long gdt_start
-vga_current_line:
-    .long 0
+
+/* Tabla de Descriptores de Interrupción (IDT) */
+idt_start:
+    /* Rellenar las primeras 12 entradas con un manejador de interrupciones genérico o vacío */
+    .rept 0x0D
+        .quad 0
+    .endr
+
+    /* Entrada para la excepción GPF (interrupción 13) */
+    .word gpf_handler
+    .word CODE_SEG
+    .byte 0
+    .byte 0b10001110
+    .word 0
+idt_end:
+
+idt_descriptor:
+    .word idt_end - idt_start
+    .long idt_start
+
+
 .code32
 protected_mode:
-    /* Setup the other segments.
-     * Those movs are mandatory because they update the descriptor cache:
-     * http://wiki.osdev.org/Descriptor_Cache
-     */
-    mov $DATA_SEG, %ax
+
+    call print_message
+
+    mov $DATA_SEG_RW, %ax /*cargamos en ax el valor de DATA_SEG y se lo cargamos a todos los registros de segmentos */
     mov %ax, %ds
     mov %ax, %es
     mov %ax, %fs
     mov %ax, %gs
     mov %ax, %ss
-    /* TODO detect the last memory address available properly.
-     * It depends on how much RAM we have.
-     */
-    mov $0X7000, %ebp
-    mov %ebp, %esp
 
-/* Setup the first Page Directory entry, which gives us a 4MB(2^10 * 2^12) memory region.
- * The memory region starts at 0, and the virtual address and physical address are identical.
- * 
- * The currently executing code is inside that range, or else we'd jump somewhere and die.
- */
-.equ page_directory, __end_align_4k
-.equ page_table, __end_align_4k + 0x1000
+looop:
+    jmp looop
 
-gdt_data_ro: /* Cambiar el nombre para evitar la redefinición */
-    .word 0xffff
-    .word 0x0
-    .byte 0x0
-    .byte 0b10010000
-    .byte 0b11001111
-    .byte 0x0
-.text
-.global test_write
+/* Manejador de interrupciones para la excepción GPF */
+gpf_handler:
+    pusha
+    mov $gpf_message, %ecx
+    call print_message_gpf
+    popa
+    jmp looop
+    
 
-test_write:
-    lea message, %si
-    call print_string   
-    mov $0x1234, %eax
-    mov %eax, %ds:(gdt_data_ro - gdt_start) 
+/* Print message on VGA */
+print_message:
+    mov $message, %ecx                  /* Load the address of the message into ECX */
+    mov vga, %eax                       /* Load the address of the VGA buffer into EAX */
+    
+    /* Calculate VGA memory address */
+    mov $160, %edx
+    mul %edx
+    lea 0xb8000(%eax), %edx
+    mov $0x0f, %ah 
+lup:
+    mov (%ecx), %al                     /* Load the character from the message into AL */
+    cmp $0, %al                         /* Check for the end of the message */
+    je thiistheend
+    
+    mov %ax, (%edx)                     /* Write the character to the VGA buffer */
+    
+    /* Move to the next character in the message and VGA buffer */
+    add $1, %ecx
+    add $2, %edx
+    jmp lup
+thiistheend:
     ret
 
-print_string:
-    lodsb               
-    test %al, %al      
-    jz done                 
-    int $0x10           
-    jmp print_string    
-done:
+/* Print message on VGA */
+print_message_gpf:
+    mov $gpf_message, %ecx                  /* Load the address of the message into ECX */
+    mov vga, %eax                           /* Load the address of the VGA buffer into EAX */
+    
+    /* Calculate VGA memory address */
+    mov $160, %edx
+    mul %edx
+    add $160, %eax                          /* Move to the next line */
+    lea 0xb8000(%eax), %edx
+    mov $0x0f, %ah 
+loop:
+    mov (%ecx), %al                         /* Load the character from the message into AL */
+    cmp $0, %al                             /* Check for the end of the message */
+    je end
+    
+    mov %ax, (%edx)                         /* Write the character to the VGA buffer */
+    
+    /* Move to the next character in the message and VGA buffer */
+    add $1, %ecx
+    add $2, %edx
+    jmp loop
+end:
     ret
 
+/* Clear VGA memory */
+clear_vga:
+    mov $0xb8000, %edi /* Start of VGA memory */
+    mov $0x0f20, %ax   /* Attribute byte (0x0f) followed by space character (0x20) */
+    mov $4000, %ecx    /* VGA memory is 4000 words long */
+    rep stosw          /* Repeat STOSW ECX times */
+    ret
+
+
+/* Message to be printed on VGA */
 message:
-    .ascii "Inicio de test_write"
-    .byte 0             
+    .asciz "P-mode"
+
+/* Mensaje a imprimir cuando se produce una excepción GPF */
+gpf_message:
+    .asciz "GPF"
+    
+/* VGA buffer address */
+vga:
+    .long 10
+           
 ```
 
 Este código configura el modo protegido en un procesador x86, define una tabla de descriptores globales (GDT) para manejar segmentos de memoria y realiza una pequeña prueba de escritura. Primero, define constantes para los segmentos de código y datos, luego le dice al procesador dónde está la GDT en memoria. A continuación, habilita el modo protegido configurando el registro de control CR0 y realiza un salto lejano al segmento de código. La GDT contiene una entrada nula, una entrada de código y una de datos, abarcando toda la memoria para facilitar el acceso. Una vez en modo protegido, se actualizan los registros de segmento con el valor del segmento de datos. Además, se define una tabla de páginas para la gestión de memoria. Finalmente, el código incluye una función de prueba que imprime un mensaje y escribe un valor en memoria usando los segmentos definidos.
