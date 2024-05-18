@@ -355,13 +355,7 @@ idt_descriptor:
     .long idt_start
 ```
 
-Este código empieza definiendo las etiquetas para los segmentos de código y datos dentro de la tabla de descriptores global (GDT). Luego, hay un manejador para fallos de protección general (GPF) que muestra "GPF!" en pantalla en un bucle infinito si ocurre un GPF.
-
-Primero estamos en modo real (16 bits). En la sección protected_mode_start, deshabilitamos las interrupciones (cli), cargamos las tablas de descriptores de IDT y GDT usando lidt y lgdt. Luego, activamos el modo protegido cambiando un bit en el registro de control cr0 y saltamos al código de modo protegido (ljmp).
-
-En el modo protegido, configuramos los segmentos de datos y la pila, y luego imprimimos "Protected Mode" en pantalla en un bucle infinito usando una interrupción de BIOS (int 0x10). La GDT se define con tres descriptores: uno nulo, uno de código y uno de datos. La IDT tiene un manejador de GPF.
-
-En resumen, el código entra en modo protegido, imprime mensajes para indicar si hubo un GPF o si se ha entrado en modo protegido, y luego se queda en bucles infinitos para no hacer nada más.
+Este código configura el modo protegido en un procesador x86, define una tabla de descriptores globales (GDT) para manejar segmentos de memoria y realiza una pequeña prueba de escritura. Primero, define constantes para los segmentos de código y datos, luego le dice al procesador dónde está la GDT en memoria. A continuación, habilita el modo protegido configurando el registro de control CR0 y realiza un salto lejano al segmento de código. La GDT contiene una entrada nula, una entrada de código y una de datos, abarcando toda la memoria para facilitar el acceso. Una vez en modo protegido, se actualizan los registros de segmento con el valor del segmento de datos. Además, se define una tabla de páginas para la gestión de memoria. Finalmente, el código incluye una función de prueba que imprime un mensaje y escribe un valor en memoria usando los segmentos definidos.
 
 ### Inicialización de segmentos 
 
