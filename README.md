@@ -256,67 +256,80 @@ En el contexto de la creación de bootloaders o firmware de bajo nivel, generar 
 
 .code16
 
-print_message:
-    mov $message, %si
-print_loop:
+gpf_handler:
+    mov $gpf_message, %si
+print_gpf_loop:
     lodsb
     or %al, %al
-    jz done_print
+    jz done_gpf_print
     mov $0x0e, %ah
     xor %bh, %bh
     int $0x10
-    jmp print_loop
-done_print:
-    ret
+    jmp print_gpf_loop
+done_gpf_print:
+    jmp done_gpf_print  /* Bucle infinito */
+gpf_message:
+    .asciz "GPF!"
 
-message:
-    .asciz "In protected mode"
-
-protected_mode_start: /* Punto de entrada */ 
+protected_mode_start:
    cli
+   lidt idt_descriptor
    lgdt gdt_descriptor
 
-   mov %cr0, %eax /* Movemos cr0 a eax para luego poner en 1 el bit menos significado (PE) */
+   mov %cr0, %eax
    orl $0x1, %eax
    mov %eax, %cr0 
 
-   ljmp $CODE_SEG, $protected_mode /* Vamos hacia el label protected_mode mas abajo */
+   ljmp $CODE_SEG, $protected_mode
 
 protected_mode:
 
-    mov $DATA_SEG, %ax /*cargamos en ax el valor de DATA_SEG y se lo cargamos a todos los registros de segmentos */
+    mov $DATA_SEG, %ax
     mov %ax, %ds
     mov %ax, %es
     mov %ax, %fs
     mov %ax, %gs
     mov %ax, %ss
 
-    mov $0X7000, %ebp /* Seteo de inicio de la pila */
-    mov %ebp, %esp
+    mov $0X7000, %esp
+    mov $0x1234, %bx
+    mov $0x5678, %cx
+    mov %cx, %ds:(%bx)
+    mov $protected_mode_message, %si
+    
+print_protected_mode_loop:
+    lodsb
+    or %al, %al
+    jz done_protected_mode_print
+    mov $0x0e, %ah
+    xor %bh, %bh
+    int $0x10
+    jmp print_protected_mode_loop
+done_protected_mode_print:
 
-    call print_message /* Llamamos a la funcion que imprime el mensaje */
+loop:
+    jmp loop
 
-    jmp $ /* loop infinito */
+protected_mode_message:
+    .asciz "Protected Mode"
 
-
-/* seteo de entrada para la tabla de descriptor */ 
 gdt_start:
     gdt_null:
-        .long 0x0 /* null entry */
         .long 0x0
-    gdt_code: /* code entry */
+        .long 0x0
+    gdt_code:
         .word 0xffff
         .word 0x0
         .byte 0x0
-        .byte 0b10011010 
-        .byte 0b11001111 /* Present, DPL = 00, ejecutable, G = 1, solo lectura */
+        .byte 0b10011010
+        .byte 0b11001111
         .byte 0x0
-    gdt_data: /* data entry */
+    gdt_data:
         .word 0xffff
         .word 0x0
         .byte 0x0
-        .byte 0b10010010 /* presente, DPL = 00, no ejecutable, leible */
-        .byte 0b11001111 
+        .byte 0b10010000
+        .byte 0b11001111
         .byte 0x0
 gdt_end:
 
@@ -324,11 +337,31 @@ gdt_descriptor:
         .word gdt_end - gdt_start
         .long gdt_start
 
+idt_start:
+    .rept 1
+        .long 0x0
+        .long 0x0
+    .endr
+    idt_gpf:
+        .word gpf_handler
+        .word CODE_SEG
+        .byte 0x0
+        .byte 0b10001110
+        .word 0x0
+idt_end:
 
-
+idt_descriptor:
+    .word idt_end - idt_start
+    .long idt_start
 ```
 
-En este código comenzamos seteando el origen del código en 0x7C00, que es donde la BIOS carga el sector de booteo, luego pasamos a la parte del label start donde se deshabilitan las interrupciones (cli) para luego cargar con el comando lgdt en la tabla de registros globales lo que se encuentra guardado en la estructura en memoria llamada gdt_desc, la cual hace referencia a la entrada de la tabla de registros que queremos guardar. Dentro de esta encontramos referencia al segmento de código y datos junto con los datos de inicio, tamaño, etc. Luego seteamos el bit de menor peso del registro cr0 en 1 para habilitar el modo protegido. Por último se inicializan los segmentos con los valores guardados en la entrada de la tabla, se setea el segmento de Pila (SS) y se imprime una letra P llamando a la interrupción 0x10. Por último se realiza un bucle infinito.
+Este código empieza definiendo las etiquetas para los segmentos de código y datos dentro de la tabla de descriptores global (GDT). Luego, hay un manejador para fallos de protección general (GPF) que muestra "GPF!" en pantalla en un bucle infinito si ocurre un GPF.
+
+Primero estamos en modo real (16 bits). En la sección protected_mode_start, deshabilitamos las interrupciones (cli), cargamos las tablas de descriptores de IDT y GDT usando lidt y lgdt. Luego, activamos el modo protegido cambiando un bit en el registro de control cr0 y saltamos al código de modo protegido (ljmp).
+
+En el modo protegido, configuramos los segmentos de datos y la pila, y luego imprimimos "Protected Mode" en pantalla en un bucle infinito usando una interrupción de BIOS (int 0x10). La GDT se define con tres descriptores: uno nulo, uno de código y uno de datos. La IDT tiene un manejador de GPF.
+
+En resumen, el código entra en modo protegido, imprime mensajes para indicar si hubo un GPF o si se ha entrado en modo protegido, y luego se queda en bucles infinitos para no hacer nada más.
 
 ### Inicialización de segmentos 
 
@@ -341,3 +374,6 @@ Una vez que estamos en modo protegido los registros de segmento se cargan con el
     mov %ax, %gs
     mov %ax, %ss
 ```
+Cuando se setea el data segment en solo lectura, esta accion genera una GPF, ya que solo segmentos de datos escribibles pueden ser cargados en registros de pila.
+
+
