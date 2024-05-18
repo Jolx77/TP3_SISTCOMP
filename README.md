@@ -409,7 +409,11 @@ vga:
            
 ```
 
-Este código configura el modo protegido en un procesador x86, define una tabla de descriptores globales (GDT) para manejar segmentos de memoria y realiza una pequeña prueba de escritura. Primero, define constantes para los segmentos de código y datos, luego le dice al procesador dónde está la GDT en memoria. A continuación, habilita el modo protegido configurando el registro de control CR0 y realiza un salto lejano al segmento de código. La GDT contiene una entrada nula, una entrada de código y una de datos, abarcando toda la memoria para facilitar el acceso. Una vez en modo protegido, se actualizan los registros de segmento con el valor del segmento de datos. Además, se define una tabla de páginas para la gestión de memoria. Finalmente, el código incluye una función de prueba que imprime un mensaje y escribe un valor en memoria usando los segmentos definidos.
+Este código es un programa de arranque en lenguaje ensamblador para una arquitectura x86 que cambia de modo real a modo protegido. Comienza definiendo los desplazamientos de los segmentos de código y datos en la Tabla Global de Descriptores (GDT) con las etiquetas `CODE_SEG` y `DATA_SEG_RW`. Luego, en modo real, deshabilita las interrupciones, carga la dirección de la GDT en el registro GDTR y configura el manejador de interrupciones para la excepción de Fallo General de Protección (GPF). 
+
+Posteriormente, activa el bit de modo protegido en el registro de control CR0 y realiza un salto largo a la etiqueta `protected_mode` en el segmento de código, cambiando efectivamente a modo protegido. Define la GDT con tres entradas: una entrada nula, una entrada para el segmento de código y una entrada para el segmento de datos. También define la Tabla de Descriptores de Interrupción (IDT) con un manejador de interrupciones genérico para las primeras 12 interrupciones y un manejador específico para la excepción GPF.
+
+Una vez en modo protegido, llama a la función `print_message` para imprimir un mensaje en la pantalla y carga el selector de segmento de datos en todos los registros de segmento. Luego entra en un bucle infinito. Si se produce una excepción GPF, imprime un mensaje de error y luego entra en un bucle infinito. Las funciones `print_message` y `print_message_gpf` imprimen mensajes en la pantalla escribiendo caracteres en el buffer de la VGA. También se define una función `clear_vga` para limpiar la pantalla. Finalmente, se definen los mensajes que se imprimirán en la pantalla y la dirección del buffer de la VGA.
 
 ### Inicialización de segmentos 
 
