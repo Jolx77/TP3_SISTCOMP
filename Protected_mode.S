@@ -31,7 +31,7 @@ gdt_start:
         .word 0xffff
         .word 0x0
         .byte 0x0
-        .byte 0b10010000 /* lectura/escritura */
+        .byte 0b10010010 /* lectura/escritura */
         .byte 0b11001111
         .byte 0x0
 gdt_end:
