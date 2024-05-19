@@ -1,5 +1,7 @@
 .equ CODE_SEG, gdt_code - gdt_start
+.equ CODE_SEG_32, gdt_code_32 - gdt_start
 .equ DATA_SEG_RW, gdt_data_rw - gdt_start
+.equ DATA_SEG_RO, gdt_data_ro - gdt_start
 
 .code16
 
@@ -27,13 +29,27 @@ gdt_start:
         .byte 0b10011010
         .byte 0b11001111
         .byte 0x0
+    gdt_code_32:
+        .word 0xffff
+        .word 0x0
+        .byte 0x0
+        .byte 0b10011010
+        .byte 0b11001111
+        .byte 0x0
     gdt_data_rw:
         .word 0xffff
         .word 0x0
         .byte 0x0
         .byte 0b10010010 /* lectura/escritura */
         .byte 0b11001111
+        .byte 0x0 
+    gdt_data_ro:
+        .word 0xffff
+        .word 0x0
         .byte 0x0
+        .byte 0b10010000 /* solo lectura */
+        .byte 0b11001111
+        .byte 0x0 
 gdt_end:
 
 gdt_descriptor:
@@ -49,7 +65,7 @@ idt_start:
 
     /* Entrada para la excepción GPF (interrupción 13) */
     .word gpf_handler
-    .word CODE_SEG
+    .word CODE_SEG_32
     .byte 0
     .byte 0b10001110
     .word 0
@@ -62,15 +78,21 @@ idt_descriptor:
 
 .code32
 protected_mode:
-
-    call print_message
-
+    call clear_vga
     mov $DATA_SEG_RW, %ax /*cargamos en ax el valor de DATA_SEG y se lo cargamos a todos los registros de segmentos */
     mov %ax, %ds
     mov %ax, %es
     mov %ax, %fs
     mov %ax, %gs
     mov %ax, %ss
+    
+    call print_message
+    /* Intentar escribir en el segmento de solo lectura */
+    mov $DATA_SEG_RO, %ax
+    mov %ax, %ds
+    mov %ax, %ss
+    call print_message_after
+
 
 looop:
     jmp looop
@@ -84,54 +106,51 @@ gpf_handler:
     jmp looop
     
 
-/* Print message on VGA */
 print_message:
     mov $message, %ecx                  /* Load the address of the message into ECX */
-    mov vga, %eax                       /* Load the address of the VGA buffer into EAX */
-    
-    /* Calculate VGA memory address */
-    mov $160, %edx
-    mul %edx
-    lea 0xb8000(%eax), %edx
-    mov $0x0f, %ah 
-lup:
-    mov (%ecx), %al                     /* Load the character from the message into AL */
-    cmp $0, %al                         /* Check for the end of the message */
-    je thiistheend
-    
-    mov %ax, (%edx)                     /* Write the character to the VGA buffer */
-    
-    /* Move to the next character in the message and VGA buffer */
-    add $1, %ecx
-    add $2, %edx
-    jmp lup
+    mov $0xb8000, %edi                  /* Load the address of the VGA buffer into EDI */
+    add $160, %edi                      /* Move to the third line */
+    mov $0x0f, %ah                         /* Set the attribute byte to white on black */
+lup2:
+    movb (%ecx), %al                    /* Load the character from the message into AL */
+    test %al, %al                       /* Check for the end of the message */
+    jz thiistheend
+    stosw                               /* Write the character to the VGA buffer and increment EDI */
+    inc %ecx                            /* Move to the next character in the message */
+    jmp lup2
 thiistheend:
     ret
 
-/* Print message on VGA */
 print_message_gpf:
-    mov $gpf_message, %ecx                  /* Load the address of the message into ECX */
-    mov vga, %eax                           /* Load the address of the VGA buffer into EAX */
-    
-    /* Calculate VGA memory address */
-    mov $160, %edx
-    mul %edx
-    add $160, %eax                          /* Move to the next line */
-    lea 0xb8000(%eax), %edx
-    mov $0x0f, %ah 
+    mov $gpf_message, %ecx              /* Load the address of the message into ECX */
+    mov $0xb8000, %edi                  /* Load the address of the VGA buffer into EDI */
+    add $640, %edi                      /* Move to the third line */
+    mov $0x0f, %ah                      /* Set the attribute byte to white on black */
 loop:
-    mov (%ecx), %al                         /* Load the character from the message into AL */
-    cmp $0, %al                             /* Check for the end of the message */
-    je end
-    
-    mov %ax, (%edx)                         /* Write the character to the VGA buffer */
-    
-    /* Move to the next character in the message and VGA buffer */
-    add $1, %ecx
-    add $2, %edx
+    movb (%ecx), %al                    /* Load the character from the message into AL */
+    test %al, %al                       /* Check for the end of the message */
+    jz end
+    stosw                               /* Write the character to the VGA buffer and increment EDI */
+    inc %ecx                            /* Move to the next character in the message */
     jmp loop
 end:
     ret
+
+print_message_after:
+    mov $message_after, %ecx            /* Load the address of the message into ECX */
+    mov $0xb8000, %edi                  /* Load the address of the VGA buffer into EDI */
+    add $320, %edi                      /* Move to the second line */
+    mov $0x0f, %ah                      /* Set the attribute byte to white on black */
+lup:
+    movb (%ecx), %al                    /* Load the character from the message into AL */
+    test %al, %al                       /* Check for the end of the message */
+    jz thiistheendmyonlyfriendtheend
+    stosw                               /* Write the character to the VGA buffer and increment EDI */
+    inc %ecx                            /* Move to the next character in the message */
+    jmp lup
+thiistheendmyonlyfriendtheend:
+    ret
+
 
 /* Clear VGA memory */
 clear_vga:
@@ -150,6 +169,8 @@ message:
 gpf_message:
     .asciz "GPF"
     
+message_after:
+    .asciz "After P-mode"    
 /* VGA buffer address */
 vga:
     .long 10
