@@ -479,15 +479,14 @@ Una vez que estamos en modo protegido los registros de segmento se cargan con el
     mov %ax, %ss
 ```
 
+Como DATA_SEG_RO esta en solo lectura, esta accion genera una GPF, ya que solo segmentos de datos escribibles pueden ser cargados en registros de pila.
+
 ```c
     mov $DATA_SEG_RO, %ax
     mov %ax, %ds
     mov %ax, %ss
     call print_message_after
 ```    
-
-Como DATA_SEG_RO esta en solo lectura, esta accion genera una GPF, ya que solo segmentos de datos escribibles pueden ser cargados en registros de pila.
-
 Funcionamiento del programa:
 - DATA_SEG_RO en solo lectura:
     - ![alt text](image-12.png)
