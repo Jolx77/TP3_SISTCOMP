@@ -43,7 +43,15 @@ Algunos de los productos que incorporan coreboot son:
 
 - Google Chromebooks: Muchos Chromebooks utilizan Coreboot como firmware base debido a su enfoque en la seguridad, la rapidez de arranque y la flexibilidad. 
 
+Algunas de las ventajas de su utilización son:
+- La inicialización de los componentes esenciales del hardware se realiza de manera eficiente y rápida, reduciendo significativamente el tiempo de arranque comparado con los BIOS tradicionales.
+- Al ser un proyecto de código abierto, permite a los usuarios y desarrolladores inspeccionar y modificar el código fuente, lo que aumenta la transparencia y la seguridad del firmware.
+- Es altamente configurable, permitiendo a los usuarios personalizar el firmware para sus necesidades específicas.
+- Su desarrollo es impulsado por una comunidad activa de desarrolladores en todo el mundo, contribuyendo al desarrollo de soporte para nuevo hardware y características adicionales.
+
 # Codigo Helloworld:
+
+Luego de seguir los pasos correspondientes, se obtuvo el siguiente resultado:
 
 ![alt text](image.png)
 
@@ -222,7 +230,10 @@ Contenido de la sección .debug_str:
  0050 333800                               38.       
  ´´´
 
+El programa fue cargado en la posición 0x00000040. Esto se debe a la presencia de una cabecera que utiliza los primeros 64 bytes para dar información. Esta cabecera indica que el archivo es un ejecutable ELF de 64 bits para la arquitectura x86-64. La cabecera ocupa los primeros 64 bytes del archivo, y contiene información esencial para el sistema operativo para interpretar correctamente el archivo ejecutable. Esta organización permite al sistema operativo cargar y ejecutar el programa correctamente.
+
 4) El resultado no fue el esperado, en clase consultaremos el motivo:
+
 ![alt text](image-1.png)
 
 5) La opción --oformat binary en el linker se utiliza para especificar el formato de salida del archivo enlazado. Cuando usas esta opción, el enlazador genera un archivo binario como salida, en lugar del formato de salida predeterminado, que podría ser un archivo ejecutable en un formato específico como ELF (Formato Ejecutable y Enlazable) o COFF (Formato Común de Archivo Objeto).
@@ -232,24 +243,29 @@ En el contexto de la creación de bootloaders o firmware de bajo nivel, generar 
 6) Depuracion:
 
 - Break direccion de arranque:
+
  ![alt text](image-2.png)
 - Break call interrupcion:
+
  ![alt text](image-3.png)
 - Una instruccion despues:
 
  ![alt text](image-4.png)
 - Un c y otra instruccion despues:
+
  ![alt text](image-5.png)
 - Otra vez, podemos observar como cada interrupcion agrega un char a la pantalla:
+
  ![alt text](image-6.png)
 - Llegamos al final, veamos linea a linea:
+
  ![alt text](image-7.png)
  ![alt text](image-8.png) 
  ![alt text](image-9.png)
  ![alt text](image-10.png)
  ![alt text](image-11.png)
 
-## Desafío final
+# DESAFIO FINAL
 
 ### Código para pasar de modo real a modo protegido
 
@@ -448,23 +464,31 @@ Finalmente se debe cargar la dirección en la que se encuenta el descriptor de s
 
 Se intenta cargar a los registros de segmento, un segmento de datos que apunta a un descriptor de segmento que tiene como uno de sus atributos el ser solo lectura.
 Primero se ve como la ejecución del ljmp carga el code segment. El registro comienza en cero:
+
  ![alt text](image+1.png)
-Y luego de la ejecución del jump aparece cargado:
+Y luego de la ejecución del ljmp aparece cargado:
+
  ![alt text](image+2.png)
 A continuación se cargan uno a uno los segmentos de datos con el registro eax, para finalizar con la carga del stack segment:
+
  ![alt text](image+3.png)
 Se ejecuta la acción y se produce una excepción de GPF que imprime un mensaje. La excepción se produce ya que no se puede definir al registro de segmento de stack como solo lectura debido a que las operaciones de stack (push, pull, etc) requieren tener la capacidad de escribir en el segmento.
 Finalmente vemos como el código no completó la acción de cargar al registro:
+
  ![alt text](image+4.png)
 
 Luego se vuelve a realizar todo la secuencia de acciones pero habiendo definido al descriptor de segmento como lectura y escritura:
 Nuevamente se ejecuta la operacion ljmp:
+
  ![alt text](image+5.png)
 Y vemos como se carga el registro cs:
+
  ![alt text](image+6.png)
 Se realiza nuevamente la carga de todos los segmentos, dejando como último la carga del ss:
+
  ![alt text](image+7.png)
 En este caso vemos como la operación pudo realizarse con éxito sin dar lugar a una excepción:
+
  ![alt text](image+8.png)
 
 ### Inicialización de segmentos 
@@ -489,7 +513,9 @@ Como DATA_SEG_RO esta en solo lectura, esta accion genera una GPF, ya que solo s
 ```    
 Funcionamiento del programa:
 - DATA_SEG_RO en solo lectura:
-    - ![alt text](image-12.png)
+
+ ![alt text](image-12.png)
 
 - DATA_SEG_RO en lectura-escritura:
-    - ![alt text](image-13.png)    
+
+ ![alt text](image-13.png)    
