@@ -1,3 +1,6 @@
+# TP3: MODO PROTEGIDO
+## Santiago Recalde, Federico Richter, Joaquin Otalora
+
 # DESAFIO 1 (UEFI y coreboot):
 
 1) UEFI significa "Unified Extensible Firmware Interface" en inglés. Es un estándar de firmware que reemplaza al BIOS tradicional en muchas computadoras modernas, brindando una interfaz entre el sistema operativo y el hardware para permitir un arranque más rápido y seguro, así como una mayor flexibilidad en la configuración del sistema. Para usar UEFI, generalmente se accede a la configuración del firmware durante el arranque de la computadora, mediante la presión de una tecla específica (como F2, F10, o Del). Desde la configuración UEFI, es posible ajustar diversas opciones relacionadas con el arranque, el hardware y otras configuraciones del sistema. Una función específica que se puede llamar utilizando la dinámica de UEFI es la de configurar el orden de arranque de los dispositivos, útil para cambiar entre sistemas operativos o iniciar desde un dispositivo externo como una unidad USB
