@@ -57,7 +57,7 @@ Algunos de los productos que incorporan coreboot son:
     Al especificar esta dirección al linker, también permite que el linker calcule correctamente las direcciones de los símbolos y etiquetas dentro del código. Por ejemplo, si defines un punto de entrada llamado __start en la dirección 0x7C00, el linker sabe que cuando se llama a __start desde otra parte del código, debe generar una instrucción de salto (jmp) a 0x7C00.
 - Magic Boot Bytes:
     En el código, después de la sección .text, hay una línea que coloca los "magic boot bytes" al final del primer sector (0x1FE es la posición justo antes del último byte del sector). Estos bytes (0xAA55) son una firma especial que el BIOS busca para identificar que el sector de arranque contiene un programa válido para iniciar el sistema.
-3) ### Preguntar en clase xd
+
 ## Salida hd: 
 ´´´ bash
 00000000  7f 45 4c 46 02 01 01 00  00 00 00 00 00 00 00 00  |.ELF............|
