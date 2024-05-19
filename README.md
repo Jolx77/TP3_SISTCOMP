@@ -415,6 +415,34 @@ Posteriormente, activa el bit de modo protegido en el registro de control CR0 y 
 
 Una vez en modo protegido, llama a la función `print_message` para imprimir un mensaje en la pantalla y carga el selector de segmento de datos en todos los registros de segmento. Luego entra en un bucle infinito. Si se produce una excepción GPF, imprime un mensaje de error y luego entra en un bucle infinito. Las funciones `print_message` y `print_message_gpf` imprimen mensajes en la pantalla escribiendo caracteres en el buffer de la VGA. También se define una función `clear_vga` para limpiar la pantalla. Finalmente, se definen los mensajes que se imprimirán en la pantalla y la dirección del buffer de la VGA.
 
+### Programa con dos descriptores de memoria diferentes
+
+El programa debería cargar en la tabla de descriptores de segmentos dos descriptores de segmentos diferentes, los cuales deberán contar con dos bases diferentes para diferentes espacios de memoria. Además de esto pueden contener límites diferentes, y deben estar seteados con los atributos correspondientes para cada caso, específicamente: S=1, E=1 (ejecutable) para el código o E=0 para los datos, y así con el resto de los mismos.
+Finalmente se debe cargar la dirección en la que se encuenta el descriptor de segmento en los registros de segmento correspondientes: el de código en el CS y el de datos en el DS, ES, FS o GS.
+
+### Carga de un segmento de datos de solo lectura
+
+Se intenta cargar a los registros de segmento, un segmento de datos que apunta a un descriptor de segmento que tiene como uno de sus atributos el ser solo lectura.
+Primero se ve como la ejecución del ljmp carga el code segment. El registro comienza en cero:
+ ![alt text](image+1.png)
+Y luego de la ejecución del jump aparece cargado:
+ ![alt text](image+2.png)
+A continuación se cargan uno a uno los segmentos de datos con el registro eax, para finalizar con la carga del stack segment:
+ ![alt text](image+3.png)
+Se ejecuta la acción y se produce una excepción de GPF que imprime un mensaje. La excepción se produce ya que no se puede definir al registro de segmento de stack como solo lectura debido a que las operaciones de stack (push, pull, etc) requieren tener la capacidad de escribir en el segmento.
+Finalmente vemos como el código no completó la acción de cargar al registro:
+ ![alt text](image+4.png)
+
+Luego se vuelve a realizar todo la secuencia de acciones pero habiendo definido al descriptor de segmento como lectura y escritura:
+Nuevamente se ejecuta la operacion ljmp:
+ ![alt text](image+5.png)
+Y vemos como se carga el registro cs:
+ ![alt text](image+6.png)
+Se realiza nuevamente la carga de todos los segmentos, dejando como último la carga del ss:
+ ![alt text](image+7.png)
+En este caso vemos como la operación pudo realizarse con éxito sin dar lugar a una excepción:
+ ![alt text](image+8.png)
+
 ### Inicialización de segmentos 
 
 Una vez que estamos en modo protegido los registros de segmento se cargan con el valor de DATA_SEG (valor arbitrario), ya que, con estas directivas se logra actualizar el caché del descriptor, utilizado por el procesador para ahorrarse consultas a la GDT (Global Descriptor Table).
